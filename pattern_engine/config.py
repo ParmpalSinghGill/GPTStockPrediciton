@@ -19,3 +19,7 @@ class Config:
     rectangle_max_bars: int = 220
     rectangle_min_touches: int = 2
     rectangle_max_outside_bars: int = 2
+    short_trend_min_bars: int = 21
+    short_trend_max_bars: int = 42
+    long_trend_min_bars: int = 252
+    long_trend_max_bars: int = 504

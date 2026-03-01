@@ -26,6 +26,7 @@ from pattern_engine.detectors import (
     HeadShouldersDetector,
     PsychologicalLineDetector,
     RectanglePatternDetector,
+    TrendDetector,
 )
 from pattern_engine.plotters import (
     CandlestickPlotter,
@@ -65,6 +66,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--rectangle-max-bars", type=int, default=220)
     p.add_argument("--rectangle-min-touches", type=int, default=2)
     p.add_argument("--rectangle-max-outside-bars", type=int, default=2)
+    p.add_argument("--short-trend-min-bars", type=int, default=21, help="Short trend min bars (~1 month).")
+    p.add_argument("--short-trend-max-bars", type=int, default=42, help="Short trend max bars (~2 months).")
+    p.add_argument("--long-trend-min-bars", type=int, default=252, help="Long trend min bars (~1 year).")
+    p.add_argument("--long-trend-max-bars", type=int, default=504, help="Long trend max bars (~2 years).")
     return p.parse_args()
 
 
@@ -84,6 +89,10 @@ def build_config(args: argparse.Namespace) -> Config:
         rectangle_max_bars=int(args.rectangle_max_bars),
         rectangle_min_touches=int(args.rectangle_min_touches),
         rectangle_max_outside_bars=int(args.rectangle_max_outside_bars),
+        short_trend_min_bars=int(args.short_trend_min_bars),
+        short_trend_max_bars=int(args.short_trend_max_bars),
+        long_trend_min_bars=int(args.long_trend_min_bars),
+        long_trend_max_bars=int(args.long_trend_max_bars),
     )
 
 
@@ -108,6 +117,7 @@ def main() -> None:
     double_detector = DoublePatternDetector()
     candle_detector = CandlestickPatternDetector()
     rectangle_detector = RectanglePatternDetector()
+    trend_detector = TrendDetector()
 
     psycho_plotter = PsychologicalPlotter()
     hs_plotter = HeadShouldersPlotter()
@@ -129,12 +139,20 @@ def main() -> None:
             dbl = double_detector.detect(ohlc, cfg)
             cdl = candle_detector.detect(ohlc)
             rect = rectangle_detector.detect(ohlc, cfg)
+            trends = trend_detector.detect(ohlc, cfg)
 
-            psycho_plotter.plot(s, ohlc, psy, trend_lines, cfg, dir_psy / f"{s}_psychological.png")
+            psycho_plotter.plot(s, ohlc, psy, trend_lines, trends, cfg, dir_psy / f"{s}_psychological.png")
             hs_plotter.plot(s, ohlc, hs, cfg, dir_hs / f"{s}_head_shoulders.png")
             double_plotter.plot(s, ohlc, dbl, cfg, dir_dbl / f"{s}_double_patterns.png")
             candle_plotter.plot(s, ohlc, cdl, cfg, dir_cdl / f"{s}_candlestick_patterns.png")
             rectangle_plotter.plot(s, ohlc, rect, cfg, dir_rect / f"{s}_rectangle_patterns.png")
+
+            short_tr = trends[trends["trend_horizon"] == "short_term"]
+            long_tr = trends[trends["trend_horizon"] == "long_term"]
+            short_dir = str(short_tr.iloc[0]["direction"]) if not short_tr.empty else "n/a"
+            long_dir = str(long_tr.iloc[0]["direction"]) if not long_tr.empty else "n/a"
+            short_bars = int(short_tr.iloc[0]["window_bars"]) if not short_tr.empty else 0
+            long_bars = int(long_tr.iloc[0]["window_bars"]) if not long_tr.empty else 0
 
             rows.append(
                 {
@@ -146,6 +164,10 @@ def main() -> None:
                     "double_patterns": int(len(dbl)),
                     "candlestick_patterns": int(len(cdl)),
                     "rectangle_patterns": int(len(rect)),
+                    "short_term_trend": short_dir,
+                    "short_term_window_bars": short_bars,
+                    "long_term_trend": long_dir,
+                    "long_term_window_bars": long_bars,
                     "date_min": str(ohlc.index.min().date()),
                     "date_max": str(ohlc.index.max().date()),
                 }
@@ -153,7 +175,7 @@ def main() -> None:
 
             print(
                 f"[ok] {s}: psych={len(psy_round)} sr={len(sr_h)} trend={len(trend_lines)} hs={len(hs)} "
-                f"double={len(dbl)} candle={len(cdl)} rect={len(rect)}"
+                f"double={len(dbl)} candle={len(cdl)} rect={len(rect)} short={short_dir} long={long_dir}"
             )
         except Exception as exc:  # noqa: BLE001
             print(f"[error] {s}: {exc}")

@@ -17,10 +17,12 @@ class PsychologicalPlotter:
         ohlc: pd.DataFrame,
         lv: pd.DataFrame,
         trend_lines: pd.DataFrame,
+        trends: pd.DataFrame,
         cfg: Config,
         out_path: Path,
     ) -> None:
         data = ohlc.tail(cfg.lookback_bars).copy()
+        base_idx = len(ohlc) - len(data)
         idx_map = {d: i for i, d in enumerate(data.index)}
         fig, ax = plt.subplots(figsize=(14, 7))
         plot_candles(ax, data)
@@ -47,9 +49,29 @@ class PsychologicalPlotter:
                     y_end = y1 + slope * (i_end - i1)
                 c = "#1f78b4" if r["line_type"] == "up_support" else "#e31a1c"
                 ax.plot([i1, i_end], [y1, y_end], color=c, linewidth=2.0, alpha=0.95)
+
+        if not trends.empty:
+            for _, r in trends.iterrows():
+                start_abs = int(r["start_idx"])
+                end_abs = int(r["end_idx"])
+                if end_abs < base_idx:
+                    continue
+                slope = float(r["slope"])
+                start_price = float(r["start_price"])
+                vis_start_abs = max(base_idx, start_abs)
+                vis_end_abs = min(len(ohlc) - 1, end_abs)
+                x0 = vis_start_abs - base_idx
+                x1 = vis_end_abs - base_idx
+                y0 = start_price + slope * (vis_start_abs - start_abs)
+                y1 = start_price + slope * (vis_end_abs - start_abs)
+                if str(r["trend_horizon"]) == "long_term":
+                    c, lw = "#6a3d9a", 2.8
+                else:
+                    c, lw = "#ff7f00", 2.2
+                ax.plot([x0, x1], [y0, y1], color=c, linewidth=lw, alpha=0.95)
         ax.set_xlim(-1, len(data) - 1 + max(8, len(data) // 12))
         style_x(ax, data)
-        ax.set_title(f"{symbol} Horizontal S/R + Psychological Trend Lines")
+        ax.set_title(f"{symbol} S/R + Psychological + Short/Long Trends")
         ax.grid(alpha=0.15)
         ax.legend(
             handles=[
@@ -57,6 +79,8 @@ class PsychologicalPlotter:
                 Line2D([0], [0], color="#444", linestyle="--", label="Horizontal Support/Resistance"),
                 Line2D([0], [0], color="#1f78b4", linewidth=2, label="Up Sloping Support"),
                 Line2D([0], [0], color="#e31a1c", linewidth=2, label="Down Sloping Resistance"),
+                Line2D([0], [0], color="#ff7f00", linewidth=2.2, label="Short-Term Trend (1-2M)"),
+                Line2D([0], [0], color="#6a3d9a", linewidth=2.8, label="Long-Term Trend (1-2Y)"),
             ],
             loc="best",
         )
