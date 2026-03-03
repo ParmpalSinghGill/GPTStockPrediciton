@@ -34,3 +34,5 @@ Thumbs.db
 pattern_plots/
 tmp/
 Data/*.pk
+
+reports

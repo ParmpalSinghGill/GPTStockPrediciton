@@ -166,7 +166,5 @@ class RectanglePatternDetector:
                     break
             if not overlap:
                 kept.append(r)
-            if len(kept) >= 5:
-                break
 
         return pd.DataFrame(kept).reset_index(drop=True)
